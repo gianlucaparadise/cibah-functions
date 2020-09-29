@@ -4,5 +4,12 @@
   "description": "Backend functions for the CIBAH chrome extension",
   "main": "index.js",
   "author": "gianlucaparadise",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node-fetch": "^2.5.7",
+    "@vercel/node": "^1.8.3"
+  },
+  "dependencies": {
+    "node-fetch": "^2.6.1"
+  }
 }
