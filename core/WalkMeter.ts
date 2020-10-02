@@ -112,12 +112,13 @@ async function getDistanceToSubways(startLatitude: number, startLongitude: numbe
         const url = `https://api.openrouteservice.org/v2/matrix/foot-walking`;
 
         log(() => `Retrieving distance to subways for (${startLatitude},${startLongitude})`);
+        const apiKey = process.env.openrouteservice_apikey;
         const response = await fetch(url, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json; charset=utf-8",
                 "Accept": "application/json, application/geo+json, application/gpx+xml, img/png; charset=utf-8",
-                "Authorization": ""
+                "Authorization": apiKey
             },
             body: request
         });

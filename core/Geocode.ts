@@ -17,7 +17,8 @@ export async function getLocationFromAddress(address: string): Promise<LatLon> {
         while (myAddress != null && myAddress.trim().length > 0) {
 
             const encodedAddress = encodeURIComponent(myAddress);
-            const geocodingUrl = `https://api.opencagedata.com/geocode/v1/json?&key=&limit=1&no_annotations=1&countrycode=it&q=${encodedAddress}`;
+            const apiKey = process.env.opencagedata_apikey;
+            const geocodingUrl = `https://api.opencagedata.com/geocode/v1/json?&key=${apiKey}&limit=1&no_annotations=1&countrycode=it&q=${encodedAddress}`;
 
             log(() => `Retrieving location for "${address}" using "${myAddress}"`);
             const response = await fetch(geocodingUrl);
