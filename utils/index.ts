@@ -8,6 +8,12 @@ export function log(obj: () => String) {
     }
 }
 
+export function logError(obj: () => String, error: any) {
+    if (debug) {
+        console.error(obj(), error);
+    }
+}
+
 export function allowCors(fn: NowApiHandler) {
     return async (req: NowRequest, res: NowResponse) => {
         res.setHeader('Access-Control-Allow-Credentials', 'true')
@@ -26,10 +32,3 @@ export function allowCors(fn: NowApiHandler) {
         return await fn(req, res)
     }
 }
-
-// const handler = (req, res) => {
-//     const d = new Date()
-//     res.end(d.toString())
-// }
-
-// module.exports = allowCors(handler)

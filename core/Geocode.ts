@@ -1,6 +1,15 @@
 import { LatLon } from "../types/LatLon";
-import { log } from "../utils";
+import { log, logError } from "../utils";
 import fetch from "node-fetch";
+import { BadRequestError, EmptyResponseError, InternalError } from "../types/Errors";
+
+export class GeocodeErrors {
+    public static readonly BadAddress = "GEOCODE-BAD-ADDRESS";
+    public static readonly OpenCageData = "GEOCODE-OPENCAGEDATA-ERROR";
+    public static readonly LocationNotFound = "GEOCODE-LOCATION-NOT-FOUND";
+    public static readonly GenericError = "GEOCODE-GENERIC-ERROR";
+    public static readonly GenericUnmappedError = "GEOCODE-GENERIC";
+}
 
 /**
  * Tries to get the location for the input address
@@ -8,11 +17,11 @@ import fetch from "node-fetch";
  * @returns {Promise<LatLon>} Coordinates of the input address or null when address is not found
  */
 export async function getLocationFromAddress(address: string): Promise<LatLon> {
-    try {
-        if (address == null || address.trim().length == 0) {
-            throw new Error("Address is empty");
-        }
+    if (address == null || address.trim().length == 0) {
+        throw new BadRequestError(GeocodeErrors.BadAddress, "Address is empty");
+    }
 
+    try {
         let myAddress = decodeURIComponent(address);
         while (myAddress != null && myAddress.trim().length > 0) {
 
@@ -24,7 +33,7 @@ export async function getLocationFromAddress(address: string): Promise<LatLon> {
             const response = await fetch(geocodingUrl);
 
             if (!response.ok) {
-                throw new Error(`Network response was not ok: ${response.status} - ${response.statusText}`);
+                throw new InternalError(GeocodeErrors.OpenCageData, `Network response was not ok: ${response.status} - ${response.statusText}`);
             }
 
             const responseBody = await response.json();
@@ -41,11 +50,14 @@ export async function getLocationFromAddress(address: string): Promise<LatLon> {
             myAddress = myAddress.split(" ").slice(1).join(" ");
         }
 
-        throw new Error("Can't find a location for address")
+        throw new EmptyResponseError(GeocodeErrors.LocationNotFound, "Can't find a location for address")
     }
     catch (error) {
-        log(() => `Error while Retrieving location for: ${address}, ${error.toString()}`);
+        if (error instanceof EmptyResponseError || error instanceof InternalError) {
+            throw error;
+        }
 
-        return null;
+        logError(() => `Error while Retrieving location for: ${address}`, error);
+        throw new InternalError(GeocodeErrors.GenericError, `Error while Retrieving location for: ${address}`)
     }
 }

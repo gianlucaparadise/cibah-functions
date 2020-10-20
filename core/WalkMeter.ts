@@ -1,8 +1,19 @@
 import { Subway, SubwayDistance } from "../types/Subway";
-import { log } from "../utils";
+import { log, logError } from "../utils";
 import fetch from "node-fetch";
+import { BadRequestError, InternalError } from "../types/Errors"
 
 const radius = 1000; // 1 Km
+
+export class WalkMeterErrors {
+    public static readonly BadCoordinates = "WALKMETER-BAD-COORDINATES";
+    public static readonly BadDestination = "WALKMETER-BAD-DESTINATION";
+    public static readonly Overpass = "WALKMETER-OVERPASS-ERROR";
+    public static readonly OpenRouteService = "WALKMETER-OPENROUTESERVICE-ERROR";
+    public static readonly GetSubwaysGenericError = "WALKMETER-GETSUBWAYS-GENERIC-ERROR";
+    public static readonly GetDistanceToSubwaysGenericError = "WALKMETER-GETDISTANCETOSUBWAYS-GENERIC-ERROR";
+    public static readonly GenericUnmappedError = "WALKMETER-GENERIC";
+}
 
 /**
  * Gets the list of subways within a fixed range of 2 Km
@@ -11,18 +22,10 @@ const radius = 1000; // 1 Km
  * @returns {Promise<SubwayDistance[]>} List of subways and their distances
  */
 export async function getSubwaysDistance(latitude: number, longitude: number): Promise<SubwayDistance[]> {
-    try {
-        const subways = await getSubways(latitude, longitude);
-        const subwayDistances = await getDistanceToSubways(latitude, longitude, subways);
+    const subways = await getSubways(latitude, longitude);
+    const subwayDistances = await getDistanceToSubways(latitude, longitude, subways);
 
-        return subwayDistances;
-
-    } catch (error) {
-        log(() => `Error in getSubwaysDistance for: (${latitude},${longitude})`);
-        log(() => error);
-
-        return null;
-    }
+    return subwayDistances;
 }
 
 /**
@@ -32,11 +35,11 @@ export async function getSubwaysDistance(latitude: number, longitude: number): P
  * @returns {Promise<Subway[]>} List of nearby subways
  */
 async function getSubways(latitude: number, longitude: number): Promise<Subway[]> {
-    try {
-        if (latitude == null || longitude == null) {
-            throw new Error("Input Data is invalid");
-        }
+    if (latitude == null || longitude == null) {
+        throw new BadRequestError(WalkMeterErrors.BadCoordinates, "Input Data is invalid");
+    }
 
+    try {
         const request = `
 			<osm-script output="json" timeout="10">
 				<query type="node">
@@ -54,7 +57,7 @@ async function getSubways(latitude: number, longitude: number): Promise<Subway[]
         const response = await fetch(url);
 
         if (!response.ok) {
-            throw new Error(`Network response was not ok: ${response.status} - ${response.statusText}`);
+            throw new InternalError(WalkMeterErrors.Overpass, `Network response was not ok: ${response.status} - ${response.statusText}`);
         }
 
         const responseBody = await response.json();
@@ -67,10 +70,13 @@ async function getSubways(latitude: number, longitude: number): Promise<Subway[]
         return subways;
 
     } catch (error) {
-        log(() => `Error while Searching for subways for location: (${latitude},${longitude})`);
-        log(() => error);
+        if (error instanceof InternalError) {
+            throw error;
+        }
 
-        return null;
+        logError(() => `Error while Searching for subways for location: (${latitude},${longitude})`, error);
+
+        throw new InternalError(WalkMeterErrors.GetSubwaysGenericError, `Error while Searching for subways for location: (${latitude},${longitude})`)
     }
 }
 
@@ -82,19 +88,19 @@ async function getSubways(latitude: number, longitude: number): Promise<Subway[]
  * @returns {Promise<SubwayDistance[]>}
  */
 async function getDistanceToSubways(startLatitude: number, startLongitude: number, subways: Subway[]): Promise<SubwayDistance[]> {
+    if (startLatitude == null || startLongitude == null) {
+        throw new BadRequestError(WalkMeterErrors.BadCoordinates, "Input location is invalid");
+    }
+
+    if (subways == null) {
+        throw new BadRequestError(WalkMeterErrors.BadDestination, "Input destination list is invalid");
+    }
+
+    if (subways.length == 0) {
+        return null
+    }
+
     try {
-        if (startLatitude == null || startLongitude == null) {
-            throw new Error("Input location is invalid");
-        }
-
-        if (subways == null) {
-            throw new Error("Input destination list is invalid");
-        }
-
-        if (subways.length == 0) {
-            return null
-        }
-
         const sourceLocation = `[${startLongitude},${startLatitude}]`;
         const sourceDestinations = subways.map((s) => `[${s.longitude},${s.latitude}]`).join(",");
         const destinationsIndex = range(subways.length, 1).join(",");
@@ -124,7 +130,7 @@ async function getDistanceToSubways(startLatitude: number, startLongitude: numbe
         });
 
         if (!response.ok) {
-            throw new Error(`Network response was not ok: ${response.status} - ${response.statusText}`);
+            throw new InternalError(WalkMeterErrors.OpenRouteService, `Network response was not ok: ${response.status} - ${response.statusText}`);
         }
 
         const responseBody = await response.json();
@@ -143,10 +149,13 @@ async function getDistanceToSubways(startLatitude: number, startLongitude: numbe
         return result;
 
     } catch (error) {
-        log(() => `Error while retrieving distance to subways for location: (${startLatitude},${startLongitude})`);
-        log(() => error);
+        if (error instanceof InternalError) {
+            throw error;
+        }
 
-        return null;
+        logError(() => `Error while retrieving distance to subways for location: (${startLatitude},${startLongitude})`, error);
+
+        throw new InternalError(WalkMeterErrors.GetDistanceToSubwaysGenericError, `Error while retrieving distance to subways for location: (${startLatitude},${startLongitude})`)
     }
 }
 

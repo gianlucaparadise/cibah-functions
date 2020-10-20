@@ -1,15 +1,37 @@
 import { NowRequest, NowResponse } from '@vercel/node'
-import { getSubwaysDistance } from '../core/WalkMeter';
+import { getSubwaysDistance, WalkMeterErrors } from '../core/WalkMeter';
+import { EmptyResponseError, InternalError, BadRequestError } from '../types/Errors';
 import { allowCors } from '../utils';
 
-export default allowCors(
-    async function (req: NowRequest, res: NowResponse) {
-        const inputLatitude = req.query.latitude as string;
-        const inputLongitude = req.query.longitude as string;
-        const latitude = parseFloat(inputLatitude);
-        const longitude = parseFloat(inputLongitude);
 
+const handler = async (req: NowRequest, res: NowResponse) => {
+    const inputLatitude = req.query.latitude as string;
+    const inputLongitude = req.query.longitude as string;
+    const latitude = parseFloat(inputLatitude);
+    const longitude = parseFloat(inputLongitude);
+
+    try {
         let result = await getSubwaysDistance(latitude, longitude);
-        res.json(result);
+        res.json({ subways: result });
+    } catch (error) {
+        if (error instanceof EmptyResponseError) {
+            res.status(404);
+            res.json({ errorCode: error.code, errorMessage: error.message });
+        }
+        else if (error instanceof InternalError) {
+            res.status(500);
+            res.json({ errorCode: error.code, errorMessage: error.message });
+        }
+        else if (error instanceof BadRequestError) {
+            res.status(400);
+            res.json({ errorCode: error.code, errorMessage: error.message });
+        }
+        else {
+            // this should never happen
+            res.status(500);
+            res.json({ errorCode: WalkMeterErrors.GenericUnmappedError, errorMessage: "Generic error while geocoding" });
+        }
     }
-)
+}
+
+export default allowCors(handler)
