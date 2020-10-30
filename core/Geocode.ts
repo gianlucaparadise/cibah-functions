@@ -5,7 +5,7 @@ import { BadRequestError, EmptyResponseError, InternalError } from "../types/Err
 
 export class GeocodeErrors {
     public static readonly BadAddress = "GEOCODE-BAD-ADDRESS";
-    public static readonly OpenCageData = "GEOCODE-OPENCAGEDATA-ERROR";
+    public static readonly OpenRouteService = "GEOCODE-OPENROUTESERVICE-ERROR";
     public static readonly LocationNotFound = "GEOCODE-LOCATION-NOT-FOUND";
     public static readonly GenericError = "GEOCODE-GENERIC-ERROR";
     public static readonly GenericUnmappedError = "GEOCODE-GENERIC";
@@ -26,23 +26,27 @@ export async function getLocationFromAddress(address: string): Promise<LatLon> {
         while (myAddress != null && myAddress.trim().length > 0) {
 
             const encodedAddress = encodeURIComponent(myAddress);
-            const apiKey = process.env.opencagedata_apikey;
-            const geocodingUrl = `https://api.opencagedata.com/geocode/v1/json?&key=${apiKey}&limit=1&no_annotations=1&countrycode=it&q=${encodedAddress}`;
+            const apiKey = process.env.openrouteservice_apikey;
+            const country = "IT"; // TODO: currently I'm stubbing country IT. Somehow this will be parametrized
+            const geocodingUrl = `https://api.openrouteservice.org/geocode/search?api_key=${apiKey}&text=${encodedAddress}&boundary.country=${country}&layers=address`;
 
-            log(() => `Retrieving location for "${address}" using "${myAddress}"`);
             const response = await fetch(geocodingUrl);
 
             if (!response.ok) {
-                throw new InternalError(GeocodeErrors.OpenCageData, `Network response was not ok: ${response.status} - ${response.statusText}`);
+                throw new InternalError(GeocodeErrors.OpenRouteService, `Network response was not ok: ${response.status} - ${response.statusText}`);
             }
 
             const responseBody = await response.json();
 
-            if (responseBody.results.length > 0) {
+            const firstResult = responseBody.features?.find(x => x.properties.confidence > 0.7); // This returns the first element with enough confidence
+            if (firstResult) {
                 // The address is correct, a location is found!
-                const firstResult = responseBody.results[0];
 
-                const result: LatLon = { latitude: firstResult.geometry.lat, longitude: firstResult.geometry.lng };
+                const lon = firstResult.geometry.coordinates[0];
+                const lat = firstResult.geometry.coordinates[1];
+                const result: LatLon = { latitude: lat, longitude: lon };
+
+                log(() => `\nFound location for "${address}" using "${myAddress}" \n Coordinates: ${lat},${lon} - Location name: ${firstResult.properties.name}`);
                 return result;
             }
 

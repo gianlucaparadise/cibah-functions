@@ -53,7 +53,6 @@ async function getSubways(latitude: number, longitude: number): Promise<Subway[]
         const encodedRequest = encodeURIComponent(request);
         const url = `https://overpass-api.de/api/interpreter?data=${encodedRequest}`;
 
-        log(() => `Retrieving subways for (${latitude},${longitude})`);
         const response = await fetch(url);
 
         if (!response.ok) {
@@ -66,6 +65,8 @@ async function getSubways(latitude: number, longitude: number): Promise<Subway[]
             const result: Subway = { latitude: el.lat, longitude: el.lon, name: el.tags.name };
             return result;
         });
+
+        log(() => `Found ${subways?.length} subways for (${latitude},${longitude})`);
 
         return subways;
 
